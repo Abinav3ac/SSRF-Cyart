@@ -1,215 +1,325 @@
-     
-   
-**SSRF Cyart**  
-**Autonomous SSRF Detection · Exploit · Verify Agent**  
-     
-     
-   ![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAADUlEQVR4nGP4//8/AwAI/AL+p5qgoAAAAABJRU5ErkJggg==)  
-     
-   ![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAADUlEQVR4nGP4//8/AwAI/AL+p5qgoAAAAABJRU5ErkJggg==)  
-   
-   **10-Phase Pipeline  ·  Differential Probing  ·  OOB-Verified  ·  Chain-Pivoting  ·  Zero False Positives**  
-   
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANElEQVR4nO3OQQmAABRAsSdYxKa/i8WMIR7ECt5E2BJsmZmt2gMA4C+Otbqr8+sJAACvXQ85PAYartXEogAAAABJRU5ErkJggg==)  
-**Overview**  
-SSRF Cyart is an enterprise-grade autonomous SSRF (Server-Side Request Forgery) detection, exploitation, and verification agent built for modern web targets. It pairs a SPA-aware native crawler with a 10-phase detection pipeline that triage, baseline, classify, fingerprint, probe, and verify every SSRF-plausible parameter on the target — stopping only when a confirmed finding is produced or all vectors are exhausted.  
-Every finding is verified via differential z-score analysis or out-of-band callback confirmation, timestamped, and delivered with a ready-to-run curl PoC and a SARIF 2.1.0 report.  
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANUlEQVR4nO3OQQmAABRAsSd40A5GMORPYEt7WMGbCFuCLTNzVFcAAPzFvVZbdX49AQDgtf0BSrIDUgOg4eAAAAAASUVORK5CYII=)  
-**Features**  
-- **10-Phase Autonomous Pipeline** — Surface Triage → Baseline → Context Classify → WAF Fingerprint → Differential Probe → OOB Correlation → Evidence Engine → Chain/Pivot → Confidence Score → Adaptive Feedback  
-- **Native BFS Crawler** — Read-only crawl with JS static analysis, form parsing, and OpenAPI/Swagger auto-discovery; no spider file required  
-- **Differential Probing** — z-score anomaly detection on timing, content-length, redirect depth, and status code — capped at 10.0 with a 2-dimension noise floor to eliminate false positives  
-- **OOB Blind SSRF Confirmation** — Per-candidate Interactsh tokens; async pattern detection for FIRM-tier findings without guessing  
-- **Evidence Engine** — Cloud IMDS (AWS/GCP/Azure), Kubernetes API, ECS Metadata, Oracle Cloud, Redis/Memcached banner, file read — schema-matched artifact extraction for CERTAIN-tier confirmation  
-- **WAF Fingerprinting & Evasion** — 11 vendor signatures (Cloudflare, Akamai, AWS WAF, Imperva, F5, etc.) with per-vendor adaptive mutation chains  
-- **Chain / Pivot Detection** — Second-order SSRF, DNS rebinding detection, K8s/ECS lateral pivot, up to max_hops=3 depth  
-- **Confidence Scoring System** — 4-tier confidence model (TENTATIVE → FIRM → CERTAIN → CRITICAL+) with known-exploit escalation and reduction caps  
-- **Authenticated Scanning** — Cookie, Bearer token, API key injection; auto-detected from spider headers  
-- **Adaptive Feedback Loop** — Pattern propagation across candidates, WAF chain caching, IMDSv2 token escalation between phases  
-- **Structured Reporting** — JSON + SARIF 2.1.0 output; curl PoC per finding; CVSS scores per tier  
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANUlEQVR4nO3OMQ2AABAAsSPBCUZfE2IYmVDBhAU2QtIq6DIzW7UHAMBfnGt1V8fXEwAAXrse/xcF7U7sx4wAAAAASUVORK5CYII=)  
-**Installation**  
- cd ssrf-cyart  
- chmod +x install.sh  
- ./install.sh  
-   
-Requires Python 3.10+. Creates an isolated .venv and links ssrf-cyart globally via /usr/local/bin/ssrf-cyart.  
-# Manual install (development editable mode)  
- python3 -m venv .venv  
- source .venv/bin/activate  
- pip install -e .  
-   
- # Verify installation  
- ssrf-cyart --version  
-   
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANElEQVR4nO3OQQmAUBBAwSfIb+HdmNvAkgaxgjcRZhLMNjNHdQUAwF/ce7Wq8+sJAACvrQctewNKtdojwQAAAABJRU5ErkJggg==)  
-**Usage**  
-# Basic detect scan from Hellhound Spider JSON file  
- ssrf-cyart --input spider_output.json http://target.com  
-   
- # No spider file — SSRF Cyart crawls the target itself  
- ssrf-cyart http://target.com  
-   
- # Native crawl scoped to an extra API subdomain, deeper BFS  
- ssrf-cyart http://target.com --crawl-scope api.target.com --crawl-depth 8  
-   
- # With OOB for blind SSRF confirmation (FIRM tier findings)  
- ssrf-cyart --input spider.json --oob https://oast.pro  
-   
- # Authenticated scan — Bearer token (JWT)  
- ssrf-cyart --input spider.json --bearer eyJhbGciOiJIUzI1NiJ9...  
-   
- # Authenticated scan — Cookie + API key  
- ssrf-cyart --input spider.json --cookie session=abc123 --api-key sk-prod --api-key-header X-Api-Key  
-   
- # Full pentest: OOB + auth + Burp proxy intercept  
- ssrf-cyart --input spider.json \  
-            --oob https://oast.pro \  
-            --bearer eyJhbGciOiJIUzI1NiJ9... \  
-            --proxy http://127.0.0.1:8080  
-   
- # Exploit mode — unlocks Gopher/Dict protocol probing (requires YES acknowledgment)  
- ssrf-cyart --input spider.json --mode detect_exploit  
-   
- # Quiet CI/CD pipeline mode  
- ssrf-cyart --input candidates.json --quiet --output /tmp/ssrf-cyart-results  
-   
- # Verbose mode — show all candidate decisions  
- ssrf-cyart --input spider.json --verbose  
-   
- # Rate limiting + custom timeout  
- ssrf-cyart --input spider.json --rate 10 --timeout 15  
-   
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANElEQVR4nO3OQQmAABRAsad4EEtY9QcxnUms4E2ELcGWmTmrKwAA/uLeqrU6vp4AAPDa/gDzXgM37EF77AAAAABJRU5ErkJggg==)  
-**Input Formats**  
-SSRF Cyart supports three input modes that all converge on the same triage and filter pipeline:  
-| | | |  
-|-|-|-|  
-| **Mode** | **Flag** | **Description** |   
-| **Spider JSON** (recommended) | --input spider.json | Output from [Hellhound Spider. Auto-detected by endpoints + meta keys. Provides full surface coverage.](https://github.com/project-hellhound-org/X5Sentry "https://github.com/project-hellhound-org/X5Sentry") |   
-| **Flat Candidate Array** | --input candidates.json | JSON array of explicit candidate objects. Each entry requires url, method, parameter, location. |   
-| **Native Crawl** | *(no * *--input* *)* | Provide a target URL only. SSRF Cyart crawls the target via BFS, form parsing, and static JS analysis — then feeds discovery through the same pipeline. |   
-   
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANUlEQVR4nO3OQQmAABRAsSd4NIGBzPXBmAawhhW8ibAl2DIze3UGAMBf3Gu1VcfXEwAAXrsehaQEN+8fLHEAAAAASUVORK5CYII=)  
-**10-Phase Pipeline**  
-| | | |  
-|-|-|-|  
-| **Phase** | **Name** | **What it does** |   
-| 00 | **Surface Triage** | Pre-score all candidates HIGH/MEDIUM/LOW via prescore.py; drop zero-score entries before any I/O |   
-| 01 | **Baseline Collection** | 5 clean samples per candidate; auth-redirect detection; infra-noise fingerprinting via InfraNoiseTracker |   
-| 02 | **Context Classifier** | Classify each candidate as fetch_url / redirect / file_include / crlf_injection / host_header |   
-| 03 | **WAF Fingerprint** | 11 vendor signatures; score-based matching; per-vendor adaptive mutation chains via waf_detector.py |   
-| 04 | **Differential Probe** | z-score anomaly on timing, redirect depth, status code, content-length (cap 10.0, 2-dim floor) |   
-| 05 | **OOB Correlation** | Per-candidate Interactsh token injection; async callback polling; DNS/HTTP pattern matching |   
-| 06 | **Evidence Engine** | AWS IMDS, GCP metadata, Azure IMDS, K8s API, ECS, Oracle Cloud, Redis/Memcached, file-read probing |   
-| 07 | **Chain / Pivot** | Second-order SSRF; DNS rebinding detection; K8s/ECS lateral pivot; max_hops=3 recursion |   
-| 08 | **Confidence Scoring** | Known-exploit registry escalation; reduction caps; per-candidate final tier assignment |   
-| 09 | **Reporter** | JSON report + SARIF 2.1.0; curl PoC per finding; CVSS per tier; timestamped artifacts |   
-| 10 | **Adaptive Feedback** | Pattern propagation across candidates; WAF chain caching; IMDSv2 token escalation |   
-   
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANklEQVR4nO3OMQ2AABAAsSNBCUpfDq4wwIAABiywEZJWQZeZ2ao9AAD+4liruzq/ngAA8Nr1ABweBgdur/QFAAAAAElFTkSuQmCC)  
-**Confidence Tiers**  
-| | | | |  
-|-|-|-|-|  
-| **Tier** | **Signal** | **CVSS** | **Severity** |   
-| TENTATIVE | Differential anomaly detected — no external confirmation | 4.3 | Medium |   
-| FIRM | OOB callback confirmed — server made outbound request | 6.5 | High |   
-| CERTAIN | Schema-matched evidence artifact (IMDS body, Redis banner, K8s version) | 8.6 | Critical |   
-| CRITICAL+ | Chained SSRF, K8s API access, or known-exploitable internal service reached | 9.6 | Critical |   
-   
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANElEQVR4nO3OQQmAUBBAwSf8GGLWDWFDY3ixgjcRZhLMNjNHdQYAwF9cq1rV/vUEAIDX7gcRXAQ2s/16gwAAAABJRU5ErkJggg==)  
-**Scan Modes**  
-| | | |  
-|-|-|-|  
-| **Mode** | **Flag** | **Description** |   
-| detect | *(default)* | Read-only detection. Safe for production targets. All 10 phases active but evidence collection restricted to non-destructive operations only. |   
-| detect_exploit | --mode detect_exploit | Unlocks Gopher/Dict protocol banner probing. Still read-only. Requires operator YES acknowledgment at runtime. **Pentest-only.** |   
-   
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANklEQVR4nO3OMQ2AABAAsSNhRAF6EPYDLhGADSywEZJWQZeZ2aszAAD+4l6rrTq+ngAA8Nr1AIWsBDYDm5cLAAAAAElFTkSuQmCC)  
-**Components**  
-| | |  
-|-|-|  
-| **Module** | **Role** |   
-| main.py | CLI entry point — argument parsing, config loading, orchestration |   
-| core/agent.py | Core orchestrator — 10-phase pipeline runner with per-phase console output |   
-| core/crawler.py | Native BFS crawler — BFS, form parsing, JS static analysis, sitemap/robots.txt |   
-| core/spider_adapter.py | Converts Hellhound Spider JSON or flat arrays into scored Candidate objects |   
-| core/prescore.py | Phase 00 — relevance scoring and triage queue ordering |   
-| core/baseline.py | Phase 01 — baseline profiling, infra-noise tracking, auth-redirect detection |   
-| core/context_classifier.py | Phase 02 — parameter context classification into 5 SSRF context classes |   
-| core/waf_detector.py | Phase 03 — 11 WAF vendor fingerprinting with adaptive evasion mutation chains |   
-| core/differential.py | Phase 04 — z-score statistical anomaly probing engine |   
-| core/oob_hub.py | Phase 05 — Interactsh OOB token lifecycle management and async polling |   
-| core/evidence_engine.py | Phase 06 — cloud metadata, Kubernetes API, Redis/Memcached, file-read extraction |   
-| core/chaining.py | Phase 07 — second-order SSRF pivot, DNS rebinding detection |   
-| core/scoring.py | Phase 08 — confidence tier assignment and reduction cap enforcement |   
-| core/reporter.py | Phase 09 — JSON + SARIF 2.1.0 report generation and curl PoC builder |   
-| core/feedback.py | Phase 10 — cross-candidate pattern propagation and adaptive chain caching |   
-| core/http_client.py | Async HTTP engine with rate limiting, proxy support, redirect handling |   
-| core/models.py | Core data models — Candidate, ProbeResult, BaselineProfile, ScanReport, etc. |   
-| core/payload_engine.py | SSRF payload construction — Gopher, Dict, cloud metadata URLs, mutation chains |   
-| core/auth_manager.py | Authentication injection — Bearer, Cookie, API key; spider header auto-detection |   
-| core/loader.py | Input file ingestion — Spider JSON and flat candidate array format parsing |   
-| core/console.py | Terminal UI — Cyber Tactical HUD, phase headers, status board, colour system |   
-| core/known_exploits.py | Known-exploit registry — escalation rules for internal services and cloud APIs |   
-| core/openapi_adapter.py | OpenAPI/Swagger spec auto-discovery and candidate generation |   
-| core/graphql_adapter.py | GraphQL introspection-based SSRF surface extraction |   
-| core/dns_intel.py | DNS intelligence gathering for rebinding and pivot analysis |   
-| core/js_intel.py | Static JS analysis — fetch/axios/XHR string literal extraction |   
-| core/recon_quality.py | Crawler output quality scoring and coverage gap detection |   
-| core/wayback_probe.py | Wayback Machine historical endpoint discovery |   
-| core/subdomain_enum.py | Subdomain enumeration for crawl scope expansion |   
-| core/spa_detector.py | SPA framework detection — React, Angular, Vue, Next.js |   
-| core/vuln_classifier.py | Post-probe vulnerability classification and severity mapping |   
-| install.sh | High-fidelity installer — creates .venv, installs deps, deploys global command |   
-   
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANUlEQVR4nO3OQQmAABRAsSd49m4tA8nPaQJjWMGbCFuCLTOzV2cAAPzFvVZbdXw9AQDgtesBorcEPwOKyvQAAAAASUVORK5CYII=)  
-**CLI Reference**  
-ssrf-cyart [OPTIONS] <target_url>  
- ssrf-cyart --input <spiderfile.json> [target_url] [OPTIONS]  
-   
- Authentication:  
-   --bearer TOKEN          Bearer/JWT token injected into every request  
-   --api-key KEY           API key value  
-   --api-key-header HDR    Header name for --api-key (default: X-Api-Key)  
-   --cookie NAME=VALUE     Session cookie (repeatable)  
-   
- OOB:  
-   --oob URL               Interactsh server for blind SSRF confirmation  
-   
- Crawl (when --input is omitted):  
-   --crawl-depth N         BFS max depth (default: 5)  
-   --crawl-max-pages N     Page budget (default: 40, ceiling: 400)  
-   --crawl-scope HOST      Extra in-scope host (repeatable)  
-   --no-crawl-js           Disable static JS analysis  
-   
- Scan Control:  
-   --mode MODE             detect (default) | detect_exploit  
-   --rate N                Requests per second (default: 20)  
-   --timeout N             Per-request timeout in seconds (default: 10)  
-   --max-hops N            SSRF chain depth limit (default: 3)  
-   --no-openapi            Disable OpenAPI/Swagger auto-discovery  
-   --proxy URL             HTTP proxy (e.g. http://127.0.0.1:8080)  
-   --config PATH           Path to config.yaml  
-   
- Output:  
-   --output DIR            Report directory (default: ./reports)  
-   --verbose               Show all candidates including clean/skipped  
-   --quiet                 Suppress banner and status board  
-   
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAAM0lEQVR4nO3OUQmAQBBAwSdcjsu6HYxoDsEK/okwk2COmdnVGQAAf3GtalX76wkAAK/dDxFWBDkFf6+SAAAAAElFTkSuQmCC)  
-**Requirements**  
-httpx[http2]>=0.27.0  
- PyYAML>=6.0.1  
- rich>=13.7.1  
-   
- # Optional — headless rendering for SPA targets  
- playwright>=1.44.0  
-   
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANUlEQVR4nO3OMQ2AABAAsSNhZscVjnidKEAGFtgISaugy8zs1RkAAH9xr9VWHV9PAAB47XoAor8EPg1yCpUAAAAASUVORK5CYII=)  
-**Legal**  
-SSRF Cyart must only be used against systems you are **explicitly authorized to test**. Unauthorized use may violate the Computer Fraud and Abuse Act (CFAA), the Computer Misuse Act, and equivalent laws in your jurisdiction.  
-*This tool is intended solely for authorized security assessments, red-team engagements, and security research.*  
-![](data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAnEAAAACCAYAAAA3pIp+AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAANklEQVR4nO3OQQmAABRAsSeYxZw/lieLGMACBrCCNxG2BFtmZquOAAD4i3Ot7mr/egIAwGvXA6fGBdgoVMwYAAAAAElFTkSuQmCC)  
-   Built by **Hellhound Security**  ·  Part of the [Project Hellhound toolkit  
- ](https://github.com/project-hellhound-org "https://github.com/project-hellhound-org")  
+# SSRF Cyart
+
+**Autonomous Server-Side Request Forgery (SSRF) Detection and Verification**
+
+SSRF Cyart is a Python-based security assessment tool for discovering, probing, and verifying potential Server-Side Request Forgery (SSRF) vulnerabilities in web applications and APIs. It combines a native breadth-first-search (BFS) crawler with a staged analysis pipeline for candidate triage, baseline collection, context classification, WAF fingerprinting, differential probing, out-of-band (OOB) correlation, evidence collection, chain analysis, confidence scoring, and structured reporting.
+
+Findings can include supporting evidence, timestamps, reproducible `curl` proof-of-concept commands, JSON output, and SARIF 2.1.0 reports. Detection results should always be reviewed in the context of the target application and the authorization scope.
+
+> **Authorized use only:** Run SSRF Cyart only against systems you own or have explicit permission to assess. Even read-oriented scans send requests and may affect target logs, rate limits, or availability. Confirm scope and scan limits before testing.
+
+## Contents
+
+- [Key Features](#key-features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Usage Examples](#usage-examples)
+- [Input Formats](#input-formats)
+- [Pipeline Overview](#pipeline-overview)
+- [Confidence Tiers](#confidence-tiers)
+- [Scan Modes](#scan-modes)
+- [CLI Reference](#cli-reference)
+- [Project Structure](#project-structure)
+- [Dependencies](#dependencies)
+- [Legal and Responsible Use](#legal-and-responsible-use)
+- [Project](#project)
+
+## Key Features
+
+- **Staged detection pipeline** — Triage, baseline collection, context classification, WAF fingerprinting, differential probing, OOB correlation, evidence collection, chain/pivot analysis, confidence scoring, reporting, and adaptive feedback.
+- **Native BFS crawler** — Discovers pages and candidate surfaces through form parsing, static JavaScript analysis, and sitemap/`robots.txt` handling; OpenAPI/Swagger discovery is also supported. A spider input file is optional.
+- **Differential probing** — Uses z-score analysis across response timing, content length, redirect depth, and HTTP status behavior, with thresholds and noise controls intended to reduce false positives.
+- **Blind SSRF confirmation** — Supports per-candidate Interactsh correlation and asynchronous DNS/HTTP callback polling when an OOB endpoint is configured.
+- **Evidence collection** — Includes probes for cloud metadata endpoints (AWS, GCP, Azure, and Oracle Cloud), Kubernetes and ECS metadata surfaces, Redis/Memcached banners, and file-read indicators.
+- **WAF fingerprinting** — Includes signatures for 11 WAF vendors and vendor-specific mutation chains.
+- **Chain and pivot analysis** — Supports second-order SSRF analysis, DNS rebinding detection, and Kubernetes/ECS pivot checks with a configurable hop limit.
+- **Confidence scoring** — Assigns findings to four tiers: `TENTATIVE`, `FIRM`, `CERTAIN`, and `CRITICAL+`.
+- **Authenticated assessment** — Supports Bearer tokens, session cookies, and API keys, including header information imported from spider input where available.
+- **Adaptive feedback** — Propagates patterns between candidates, caches WAF mutation chains, and supports IMDSv2 token escalation logic.
+- **Structured output** — Produces JSON and SARIF 2.1.0 reports, timestamps artifacts, and can include a `curl` PoC for each reported finding.
+- **Workflow integration** — Supports HTTP proxy configuration, rate limiting, quiet output, and configurable report directories.
+
+## Installation
+
+### Install using the project installer
+
+From the repository directory:
+
+```bash
+cd ssrf-cyart
+chmod +x install.sh
+./install.sh
+```
+
+The installer is designed to create an isolated `.venv`, install the project dependencies, and expose the `ssrf-cyart` command through `/usr/local/bin/ssrf-cyart`. The global link may require elevated permissions, depending on your environment.
+
+Verify the installation:
+
+```bash
+ssrf-cyart --version
+```
+
+### Manual installation (development mode)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+ssrf-cyart --version
+```
+
+**Requirement:** Python 3.10 or newer.
+
+## Quick Start
+
+### Scan a target with the native crawler
+
+```bash
+ssrf-cyart https://target.example
+```
+
+### Scan candidates from Hellhound Spider output
+
+```bash
+ssrf-cyart --input spider_output.json https://target.example
+```
+
+### Specify an output directory
+
+```bash
+ssrf-cyart --input candidates.json --quiet --output ./reports
+```
+
+Use only a target and input file that are within your authorized assessment scope.
+
+## Usage Examples
+
+### Native crawl with an additional in-scope API host
+
+```bash
+ssrf-cyart https://target.example \
+  --crawl-scope api.target.example \
+  --crawl-depth 8
+```
+
+### Out-of-band checks for blind SSRF
+
+```bash
+ssrf-cyart --input spider.json --oob https://oast.example
+```
+
+Replace the example hostname with an OOB endpoint you control or are authorized to use.
+
+### Authenticated assessment with a Bearer token
+
+```bash
+export CYART_TOKEN='replace-with-an-authorized-test-token'
+ssrf-cyart --input spider.json --bearer "$CYART_TOKEN"
+unset CYART_TOKEN
+```
+
+### Authenticated assessment with a session cookie and API key
+
+```bash
+export CYART_COOKIE='session=replace-with-test-session'
+export CYART_API_KEY='replace-with-test-api-key'
+
+ssrf-cyart --input spider.json \
+  --cookie "$CYART_COOKIE" \
+  --api-key "$CYART_API_KEY" \
+  --api-key-header X-Api-Key
+
+unset CYART_COOKIE CYART_API_KEY
+```
+
+Avoid putting real credentials directly in shell commands, scripts, or shared logs. Environment variables reduce accidental exposure in command text, but they are not a secret-management system.
+
+### Use a local HTTP proxy (for example, Burp Suite)
+
+```bash
+ssrf-cyart --input spider.json \
+  --proxy http://127.0.0.1:8080
+```
+
+### Enable the additional protocol-probing mode
+
+```bash
+ssrf-cyart --input spider.json --mode detect_exploit
+```
+
+This mode is intended for authorized penetration tests. Review the tool's runtime acknowledgment and the scope rules for your engagement before proceeding.
+
+### Adjust request rate and timeout
+
+```bash
+ssrf-cyart --input spider.json --rate 10 --timeout 15
+```
+
+### Inspect clean and skipped candidates
+
+```bash
+ssrf-cyart --input spider.json --verbose
+```
+
+## Input Formats
+
+All input modes feed into the same candidate triage and filtering workflow.
+
+| Mode | How to use it | Description |
+|---|---|---|
+| **Hellhound Spider JSON** (recommended) | `--input spider.json` | Uses output from [Hellhound Spider / X5Sentry](https://github.com/project-hellhound-org/X5Sentry). Candidate endpoints and metadata are detected from the input structure. |
+| **Flat candidate array** | `--input candidates.json` | Accepts a JSON array of candidate objects. Each entry requires `url`, `method`, `parameter`, and `location`. |
+| **Native crawl** | Provide a target URL without `--input` | Performs a BFS crawl with form parsing and static JavaScript analysis, then sends discovered candidates through the pipeline. |
+
+## Pipeline Overview
+
+The implementation labels its stages from `00` through `10`.
+
+| Phase | Stage | Responsibility |
+|---:|---|---|
+| 00 | **Surface triage** | Scores candidates as HIGH, MEDIUM, or LOW and removes zero-score entries before network I/O. |
+| 01 | **Baseline collection** | Collects five clean samples per candidate; detects authentication redirects and tracks infrastructure noise. |
+| 02 | **Context classification** | Classifies candidates into `fetch_url`, `redirect`, `file_include`, `crlf_injection`, or `host_header` contexts. |
+| 03 | **WAF fingerprinting** | Matches WAF vendor signatures and selects vendor-specific mutation chains. |
+| 04 | **Differential probing** | Analyzes timing, redirect depth, status code, and content-length anomalies using z-score thresholds and a multi-dimension noise floor. |
+| 05 | **OOB correlation** | Injects candidate-specific Interactsh tokens and correlates asynchronous DNS/HTTP callbacks. |
+| 06 | **Evidence engine** | Checks configured cloud metadata, Kubernetes/ECS, Redis/Memcached, and file-read evidence paths. |
+| 07 | **Chain / pivot analysis** | Examines second-order SSRF, DNS rebinding, and Kubernetes/ECS pivot opportunities within the configured hop limit. |
+| 08 | **Confidence scoring** | Applies known-exploit escalation and reduction rules to assign a final confidence tier. |
+| 09 | **Reporting** | Generates JSON and SARIF 2.1.0 output, timestamps artifacts, and builds `curl` PoCs where available. |
+| 10 | **Adaptive feedback** | Propagates observed patterns across candidates, caches WAF chains, and supports IMDSv2 token escalation logic. |
+
+## Confidence Tiers
+
+The tiers express the strength of the evidence collected. They are not a substitute for analyst validation or environment-specific impact assessment.
+
+| Tier | Evidence signal (as defined by the project) | Reference CVSS | CVSS v3.1 severity band |
+|---|---|---:|---|
+| `TENTATIVE` | Differential anomaly detected without external confirmation | 4.3 | Medium |
+| `FIRM` | OOB callback confirms an outbound request | 6.5 | Medium |
+| `CERTAIN` | Schema-matched evidence artifact, such as an IMDS response, Redis banner, or Kubernetes version | 8.6 | High |
+| `CRITICAL+` | Chained SSRF, Kubernetes API access, or a known-exploitable internal service is reached | 9.6 | Critical |
+
+**Scoring note:** The numbers above are the project's reference values from the supplied specification. CVSS is intended to rate the severity of a specific vulnerability using its characteristics and impact; a confidence tier alone is not enough to determine an appropriate CVSS score. Recalculate and document the score for each validated finding before using it for formal risk decisions. CVSS v3.1 rates 6.5 as **Medium** and 8.6 as **High**, according to FIRST's severity scale: [CVSS v3.1 specification](https://www.first.org/cvss/v3.1/specification.document).
+
+## Scan Modes
+
+| Mode | Flag | Description |
+|---|---|---|
+| **Detection** (default) | `--mode detect` or omit `--mode` | Read-oriented detection workflow. Evidence collection is described by the project as restricted to non-destructive operations in this mode. Requests can still affect the target, so production use requires authorization and suitable rate limits. |
+| **Detection / additional protocol probing** | `--mode detect_exploit` | Enables additional Gopher/Dict protocol banner probing. The project describes this mode as read-only and requires a runtime `YES` acknowledgment; use it only in an authorized penetration test. |
+
+## CLI Reference
+
+```text
+ssrf-cyart [OPTIONS] <target_url>
+ssrf-cyart --input <spiderfile.json> [target_url] [OPTIONS]
+```
+
+### Authentication
+
+| Option | Description |
+|---|---|
+| `--bearer TOKEN` | Inject a Bearer/JWT token into requests. |
+| `--api-key KEY` | API key value. |
+| `--api-key-header HDR` | Header name for the API key; default: `X-Api-Key`. |
+| `--cookie NAME=VALUE` | Session cookie; repeatable. |
+
+### Out-of-band confirmation
+
+| Option | Description |
+|---|---|
+| `--oob URL` | Interactsh-compatible server endpoint for blind SSRF correlation. |
+
+### Crawling (when `--input` is omitted)
+
+| Option | Default / description |
+|---|---|
+| `--crawl-depth N` | Maximum BFS depth; default: `5`. |
+| `--crawl-max-pages N` | Page budget; default: `40`, documented ceiling: `400`. |
+| `--crawl-scope HOST` | Add an in-scope host; repeatable. |
+| `--no-crawl-js` | Disable static JavaScript analysis. |
+
+### Scan control
+
+| Option | Default / description |
+|---|---|
+| `--mode MODE` | `detect` (default) or `detect_exploit`. |
+| `--rate N` | Request rate per second; default: `20`. |
+| `--timeout N` | Per-request timeout in seconds; default: `10`. |
+| `--max-hops N` | SSRF chain depth limit; default: `3`. |
+| `--no-openapi` | Disable OpenAPI/Swagger auto-discovery. |
+| `--proxy URL` | HTTP proxy, such as `http://127.0.0.1:8080`. |
+| `--config PATH` | Path to `config.yaml`. |
+
+### Output and diagnostics
+
+| Option | Description |
+|---|---|
+| `--output DIR` | Report directory; default: `./reports`. |
+| `--verbose` | Show all candidates, including clean or skipped entries. |
+| `--quiet` | Suppress the banner and status board. |
+
+Use `ssrf-cyart --help` to check the options supported by the installed version.
+
+## Project Structure
+
+| Module | Responsibility |
+|---|---|
+| `main.py` | CLI entry point, argument parsing, configuration loading, and orchestration. |
+| `core/agent.py` | Runs the staged pipeline and emits phase-level console output. |
+| `core/crawler.py` | Native BFS crawler, form parsing, JavaScript analysis, sitemap, and `robots.txt` handling. |
+| `core/spider_adapter.py` | Converts Hellhound Spider JSON or flat arrays into scored candidate objects. |
+| `core/prescore.py` | Candidate relevance scoring and triage ordering. |
+| `core/baseline.py` | Baseline profiling, infrastructure-noise tracking, and authentication-redirect detection. |
+| `core/context_classifier.py` | Classifies candidate parameters into five SSRF context classes. |
+| `core/waf_detector.py` | WAF fingerprinting and adaptive mutation chains. |
+| `core/differential.py` | Z-score-based statistical anomaly probing. |
+| `core/oob_hub.py` | Interactsh token lifecycle management and asynchronous callback polling. |
+| `core/evidence_engine.py` | Cloud metadata, Kubernetes API, Redis/Memcached, and file-read evidence checks. |
+| `core/chaining.py` | Second-order SSRF, pivot analysis, and DNS rebinding detection. |
+| `core/scoring.py` | Confidence-tier assignment and score-reduction rules. |
+| `core/reporter.py` | JSON/SARIF 2.1.0 report generation and `curl` PoC construction. |
+| `core/feedback.py` | Cross-candidate pattern propagation and adaptive chain caching. |
+| `core/http_client.py` | Asynchronous HTTP engine with rate limiting, proxy support, and redirect handling. |
+| `core/models.py` | Core data models, including `Candidate`, `ProbeResult`, `BaselineProfile`, and `ScanReport`. |
+| `core/payload_engine.py` | SSRF payload construction and mutation chains. |
+| `core/auth_manager.py` | Bearer, cookie, and API-key injection; spider-header detection. |
+| `core/loader.py` | Spider JSON and flat candidate-array ingestion. |
+| `core/console.py` | Terminal HUD, phase headers, status board, and colour system. |
+| `core/known_exploits.py` | Known-exploit registry and escalation rules for internal services and cloud APIs. |
+| `core/openapi_adapter.py` | OpenAPI/Swagger discovery and candidate generation. |
+| `core/graphql_adapter.py` | GraphQL introspection-based SSRF surface extraction. |
+| `core/dns_intel.py` | DNS intelligence for rebinding and pivot analysis. |
+| `core/js_intel.py` | Static JavaScript analysis for `fetch`, Axios, and XHR string literals. |
+| `core/recon_quality.py` | Crawler-output quality scoring and coverage-gap detection. |
+| `core/wayback_probe.py` | Historical endpoint discovery through the Wayback Machine. |
+| `core/subdomain_enum.py` | Subdomain enumeration for crawl-scope expansion. |
+| `core/spa_detector.py` | Detection of SPA frameworks such as React, Angular, Vue, and Next.js. |
+| `core/vuln_classifier.py` | Post-probe vulnerability classification and severity mapping. |
+| `install.sh` | Creates the virtual environment, installs dependencies, and deploys the command. |
+
+## Dependencies
+
+Core dependencies listed by the project:
+
+```text
+httpx[http2]>=0.27.0
+PyYAML>=6.0.1
+rich>=13.7.1
+```
+
+Optional dependency for headless rendering of SPA targets:
+
+```text
+playwright>=1.44.0
+```
+
+The package installer and project metadata should remain the source of truth for the exact dependency set used by a given release.
+
+## Legal and Responsible Use
+
+SSRF Cyart is intended for authorized security assessments, red-team engagements, and security research. Only test assets for which you have explicit authorization, and follow the engagement's scope, request-rate limits, data-handling rules, and disclosure process. Unauthorized testing may violate applicable law, including computer-misuse and unauthorized-access laws in your jurisdiction.
+
+The operator is responsible for validating findings, reviewing proof-of-concept output before use, protecting credentials and collected evidence, and ensuring that testing does not access or expose data outside the approved scope.
